@@ -244,8 +244,13 @@ First push: github.com/www123431/macro-intern-agent  (March 2026
 Renamed:    github.com/www123431/macroalphapro  (2026-06-24 — user
   did GitHub UI rename to drop the "intern" suffix that read as
   junior + drop ~1 GB of unreachable git-cruft accumulated from
-  force-pushes; this is the canonical URL referenced throughout
-  all docs from v3 onward)
+  force-pushes)
+
+User renamed: github.com/falsifiable-t/macroalphapro  (2026-06-24
+  later — `www123431` read as auto-generated placeholder; renamed
+  the GitHub account to `falsifiable-t` (Popperian falsifiability,
+  the project's epistemic anchor). Canonical URL from v7 onward.
+  Old `www123431` URLs auto-301 to the new handle.)
 ```
 
 Old branch `www123431-patch-1` was deleted before the rename

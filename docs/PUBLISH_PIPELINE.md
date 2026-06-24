@@ -27,7 +27,7 @@ cd ${REPO_ROOT}/Desktop/macroalphapro-public
 git init
 git add .
 git commit -m "Initial public release"
-git remote add origin git@github.com:www123431/macroalphapro.git
+git remote add origin git@github.com:falsifiable-t/macroalphapro.git
 git push -u origin main
 
 # 5. (subsequent runs) commit + push delta
@@ -58,7 +58,7 @@ git push
    C:/Users/.../macroalphapro-public/  ← clean, sanitized snapshot
         │  (manual git push, weekly)
         ▼
-   github.com/www123431/macroalphapro   ← public mirror
+   github.com/falsifiable-t/macroalphapro   ← public mirror
 ```
 
 ## What gets included

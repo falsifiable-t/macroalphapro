@@ -597,7 +597,7 @@ snapshot = one disciplined chore that costs nothing per dev commit.
 
 **USER ACTION pending before first push**: rotate AV_KEY +
 GNEWS_KEY (in git history pre-cf06b833) + create
-github.com/www123431/macroalphapro public repo.
+github.com/falsifiable-t/macroalphapro public repo.
 
 ### 14.2 UI integration response to 3-perspective senior audit
 
@@ -766,7 +766,7 @@ with a tightened `.publishrc.yaml`:
 Public snapshot final state:
   ~2,165 files / ~31 MB / 73 sanitized / 0 forbidden hits
 
-Pushed to github.com/www123431/macroalphapro (public repo) on
+Pushed to github.com/falsifiable-t/macroalphapro (public repo) on
 2026-06-24. Initial push went to a temporarily-named repo that was
 then deleted + recreated with the canonical name to drop ~1 GB of
 unreachable cruft from the force-push history.

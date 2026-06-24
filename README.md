@@ -228,7 +228,7 @@ python -m pytest tests/test_claim_type_router.py
 ### Quick start (no WRDS, sample data only)
 
 ```bash
-git clone https://github.com/www123431/macroalphapro.git
+git clone https://github.com/falsifiable-t/macroalphapro.git
 cd macroalphapro
 pip install -r requirements.txt
 python -m pytest tests/ -k "not wrds"     # ~10s, unit tests only
@@ -299,7 +299,7 @@ python scripts/reports/report_belief_track_record_rigor.py
 
 ## Contact
 
-[LinkedIn](https://www.linkedin.com/in/zhangxizhe) · [GitHub](https://github.com/www123431/macroalphapro) · e1521244 @ u.nus.edu
+[LinkedIn](https://www.linkedin.com/in/zhangxizhe) · [GitHub](https://github.com/falsifiable-t/macroalphapro) · e1521244 @ u.nus.edu
 
 Open to applied-AI research-engineer roles (LLM systems + calibration / agent orchestration) and quant research-engineer positions at research-driven firms, mid-2026 onward.
 
