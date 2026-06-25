@@ -32,6 +32,12 @@ OUT_LOOCV_MD = REPO_ROOT / "data" / "research" / "belief_ensemble_loocv.md"
 def main() -> None:
     print("[1/3] running ensemble sweep...")
     out = sweep_ensemble_per_family()
+    if out.get("n_total", 0) == 0:
+        print("      no autopsies available; nothing to sweep")
+        print("      (live data at data/research/autopsies.jsonl is excluded "
+              "from the public snapshot; data/_samples/autopsies_sample.jsonl "
+              "is the fallback fixture — see data/_samples/README.md)")
+        return
     print(f"      final Brier: {out['final_ensemble_brier']} "
           f"vs LLM-only {out['llm_only_brier']} "
           f"vs family-only {out['family_only_brier']}")
@@ -58,7 +64,7 @@ def main() -> None:
         f"- **Ensemble Brier:      {out['final_ensemble_brier']:.4f}** "
         f"(per-family optimal w_fam + global fallback {out['global_w_fallback']})",
         f"- Improvement vs LLM:    **{out['improvement_vs_llm']:+.4f} "
-        f"({out['improvement_vs_llm']/out['llm_only_brier']*100:+.1f}%)**",
+        f"({(out['improvement_vs_llm']/out['llm_only_brier']*100) if out['llm_only_brier'] else 0.0:+.1f}%)**",
         f"- Improvement vs family: {out['improvement_vs_fam']:+.4f}",
         "",
         f"_{out['n_families_eligible']} of {out['n_families_total']} families "

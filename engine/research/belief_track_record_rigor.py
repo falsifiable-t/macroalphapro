@@ -78,7 +78,27 @@ MIN_FAMILY_N = 3      # don't bootstrap families with n<3 (CI uninformative)
 
 
 def _load_autopsies(path: Optional[Path] = None) -> list[dict]:
+    """Load autopsies, falling back to data/_samples/ for the public
+    snapshot where data/research/autopsies.jsonl is excluded.
+
+    The fallback lets `python scripts/reports/report_belief_track_record_rigor.py`
+    actually reproduce the headline Brier number from a clean clone —
+    otherwise the script writes a zero-fixture report and the user
+    sees nothing matching the arxiv paper."""
     p = path or AUTOPSIES_PATH
+    if not p.is_file():
+        # Public-snapshot fallback: data/_samples/autopsies_sample.jsonl
+        # is whitelisted in .publishrc.yaml. Header in data/_samples/README.md
+        # documents the snapshot date + n.
+        from engine.research.belief_autopsy import _REPO_ROOT as _ROOT
+        sample = _ROOT / "data" / "_samples" / "autopsies_sample.jsonl"
+        if sample.is_file():
+            import logging
+            logging.getLogger(__name__).info(
+                "_load_autopsies: %s not present; falling back to fixture %s",
+                p, sample,
+            )
+            p = sample
     rows = []
     for row in _iter_jsonl(p):
         if row.get("superseded_by"):

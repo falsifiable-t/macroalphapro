@@ -1,18 +1,19 @@
 # MacroAlphaPro
 
-**An AI-augmented quant research workbench that publicly tracks the
-calibration of its own predictions before each test runs.**
+**The system measured its own LLM predictor against a fair family-prior
+baseline, found it LOSES by +0.114 Brier, and published the loss
+instead of hiding it.** That epistemic posture — and the air-gapped
+calibration infra that makes it falsifiable — is the project's headline.
 
-> One person. ~10 months. 4-sleeve canonical-replay strategy book
-> (Sharpe 1.32 backtest, paper-trade live), Belief Layer that air-gaps
-> every LLM prediction from the verdict pipeline so calibration is
-> measurable (n=94 prediction-verdict autopsies at paper v0.9; cron-refreshed daily), 660+ paper ingestion
-> pipeline, end-to-end autonomous research demonstration on cross-asset
-> bond-VRP. The system measured its own predictor against a fair
-> family-prior baseline and found it loses by +0.114 Brier — and
-> published that finding instead of hiding it.
+The wrapper around it: a solo-built AI-augmented quant research
+workbench. 4-sleeve canonical-replay strategy book (Sharpe 1.32
+backtest, paper-trade live since 2026-05-13). 661-paper ingestion
+pipeline. End-to-end autonomous research demonstration on cross-asset
+bond-VRP. 9-station UI-triggerable Operator Console with import-time
+capital-decision doctrine enforcement. arxiv preprint v0.9 ready for
+submission.
 
-**Author**: [Zhang Xizhe](https://www.linkedin.com/in/zhangxizhe) (NUS MSBA 2026)
+**Author**: [Zhang Xizhe (Terrence)](https://www.linkedin.com/in/zhangxizhe) (NUS MSBA 2026)
 **Status**: paper-trade live since 2026-05-13 · Operator Console v1
 (9 of 9 Pipeline Stations) · arxiv preprint v0.9 ready for submission
 
@@ -43,9 +44,37 @@ event: `engine/research_store/events.jsonl` (event_type=factor_verdict_filed).
 | End-to-end autonomous demonstration | bond-VRP RED verdict, no human in the prediction loop (consistent with Carr-Wu 2009) | paper §5 |
 | **Operator Console (2026-06-23 → 9/9 stations 2026-06-25)** | **9 of 9 Pipeline Stations live** — UI-triggerable end-to-end research pipeline + typed sessions + per-session cost cap + SSE streaming + audit trail | `engine/operator_console/` |
 | Papers ingested + tagged | **661** via Stage-0 ClaimType router | `engine/agents/papers_curator/` |
-| Engineering surface | 117 research modules · 247 scripts · ~20 agents · FastAPI + Next.js · **5,805 pytest tests** | this repo |
+| Engineering surface | 117 research modules · 247 scripts · ~20 agents · FastAPI + Next.js · **357 test files / ~5,800 assertions** | this repo |
 
 (More context: ~$19/mo operating cost · sequential-specialist multi-agent architecture (not free debate) · 3 STANDING doctrines in [CLAUDE.md](CLAUDE.md). Full table in [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md).)
+
+> **Number reconciliation (read once, then it's clear):** Two
+> deployed-book definitions co-exist. (a) **4-sleeve canonical
+> replay** = K1_BAB / D_PEAD / PATH_N / CTA_PQTIX over 486 weekly
+> obs ~9.4 years; this is the **Sharpe 1.32** figure cited in the
+> paper. (b) **5-sleeve current operating book** = equity_book /
+> cross_asset_carry / cross_asset_tsmom / crisis_hedge_tlt_gld /
+> mom_hedge_overlay; this is what `engine.portfolio.deployed_registry.load_active()`
+> returns and is the surface S8 Rollback acts on. Both are real;
+> both ship in the docs. The 4-sleeve replay is the audited backtest
+> (clean, no look-ahead) while the 5-sleeve book is the present
+> operating state (post-decisions made after the replay window
+> closed). The earlier arxiv draft conflated the two; v0.9 §A.8
+> discloses + resolves the inconsistency.
+
+---
+
+## AI-engineering surface (for AI / LLM / agent infra recruiters)
+
+| Component | What it is | Where |
+|---|---|---|
+| **Air-gapped predictor + calibration ledger** | Belief layer commits a typed `PredictedVerdictDist` BEFORE each verdict runs; a structural test walks the AST and forbids any module under `engine/research/` from importing `engine.research.belief` outside a whitelist. **Calibration is testable because the architecture makes it falsifiable.** | `engine/research/belief.py` + `tests/test_belief.py:test_air_gap_lens_strict_gate_template_must_not_import_belief` |
+| **8-test rigor harness** | Bootstrap CI / paired delta / time-aware FAIR baseline / sign test / Benjamini-Hochberg FDR (q=0.10) / Mann-Kendall / Hosmer-Lemeshow / LOOCV. `BOOTSTRAP_B = 10000, RNG_SEED = 42` — reproducibility is real. | `engine/research/belief_track_record_rigor.py` |
+| **Multi-model routing (workload → provider)** | LLM workloads dispatch to provider+model via a single table. Sonnet for synthesis / extraction, Gemini Flash for high-volume tagging. ~89% volume on Flash, ~46% spend on Sonnet. R1/Deepseek A/B was audited + rejected (kept Claude for spec drafting). | `engine/llm/call.py` workload table + `data/llm_cost_ledger.jsonl` |
+| **Sequential-specialist multi-agent (Pattern 1, not Pattern 5)** | α pre-mortem / β cross-domain / γ replication / DA pre+post / strengthener / decay sentinel — each agent owns ONE distinct epistemic lens, fans out via `asyncio.gather`, NO turn-taking debate. Tetlock 2017 fake-diversity literature explicitly cited as the reason; the doctrine is enforced by code review, not just docs. | `engine/research/agent_council.py:5-6` + memory `feedback_anti_n_persona_brainstorm_2026-06-14.md` |
+| **MCP server (`intern-research`)** | Internal MCP server exposing the project's typed research toolkit (intuition-rules query, graveyard lookup, mechanism library, Sharpe-SE estimator, family n_trials, L4 outcome ledger). Used by Claude Code sessions to ground recommendations in the actual research state — no LLM hallucinations about which factor families have how many trials. | MCP server registered as `intern-research` in `.claude/settings.local.json` |
+| **Operator Console with capital-doctrine code enforcement** | 9 Pipeline Stations. `StationSpec.mutates_capital` flag is enforced at import time: any station declaring `mutates_capital=True` whose source doesn't reference `_proposals.jsonl` (proof of routing to /approvals) raises `CapitalDoctrineViolation` on register. **The doctrine is the type system, not a comment.** | `engine/operator_console/registry.py` + `engine/operator_console/stations/` |
+| **Typed event store + session protocol** | Every research state change emits a typed event (`factor_verdict_filed`, `capability_evidence_filed`, `memory_doctrine_locked`, ...). Session lifecycle (research_new / audit / ops / doctrine / exploration) is first-class with pre-flight + exit conditions. Ad-hoc state is structurally excluded. | `engine/research_store/` + CLAUDE.md "Session Protocol Doctrine" |
 
 ---
 
@@ -223,7 +252,7 @@ python scripts/reports/report_belief_ensemble_sweep.py
 # Reproduces: Section 4 of arxiv paper, including the LOOCV honesty pass
 
 # 3. ClaimType router accuracy on labeled fixture
-python -m pytest tests/test_claim_type_router.py
+python -m pytest tests/test_papers_curator_claim_type_router.py
 # Reproduces: Section 2.4 (router v2 false-positive rate ~0%)
 ```
 
@@ -232,10 +261,10 @@ python -m pytest tests/test_claim_type_router.py
 | Path | Needs | Time | What you get |
 |---|---|---|---|
 | **Read the code + paper** | nothing | 0 | The methodology + statistical anchors are all in `docs/` + inline; this is the path most readers should take |
-| **Reproduce the belief-layer headline numbers** | Python 3.10+ | ~10 min | Brier 0.374, the honest-negative finding, ClaimType router accuracy — the 3 numbered scripts in *Reproducibility* above. No external data, no API keys. |
-| **Run the test suite** | Python 3.10+ | ~5 min | 5,744 of 5,805 tests collect without WRDS (the 61 deselected ones probe live WRDS connections) |
+| **Reproduce the belief-layer headline numbers** | Python 3.10+ | ~10 min | Brier ~0.37, the honest-negative finding, ClaimType router accuracy. Fixture at `data/_samples/autopsies_sample.jsonl` ships with the snapshot so the 3 numbered scripts in *Reproducibility* above run end-to-end without WRDS / API keys. |
+| **Run the test suite** | Python 3.10+ | ~5 min | 357 test files / ~5,800 assertions; 5,744 of 5,805 collect-time IDs run without WRDS (61 deselected probe live WRDS) |
 | **Run the Operator Console UI** | Python 3.10+ · Node 18+ | ~20 min | Local FastAPI backend + Next.js frontend; ingest a paper, browse stations, see SSE progress live |
-| **Reproduce the live backtest** | WRDS subscription + credentials | several hours | The Sharpe 1.32 4-sleeve replay; needs CRSP/Compustat/IBES/OptionMetrics |
+| **Reproduce the live backtest** | WRDS subscription + credentials | several hours | The Sharpe 1.32 4-sleeve canonical replay; needs CRSP / Compustat / IBES / OptionMetrics |
 
 ### Quick start — minimal path (no WRDS, no Node, ~10 min)
 
@@ -247,7 +276,7 @@ cd macroalphapro
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Sanity: 52 fast tests (router + track-record) pass clean, no external data
+# Sanity: 30 fast tests (router + track-record) pass clean, no external data
 python -m pytest tests/test_papers_curator_claim_type_router.py tests/test_belief_track_record.py -q
 
 # Reproduce the headline Brier number from the arxiv paper

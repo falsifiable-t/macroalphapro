@@ -1,42 +1,49 @@
 # Macro Alpha Pro — Python dependencies
-# See docs/deployment_guide.md for full setup instructions.
+# Tested on Python 3.10 / 3.11 (Windows + Linux). 3.12 unverified.
 
 # ── Core data + numerics ─────────────────────────────────────────────────────
 numpy
 pandas
-pyarrow                    # parquet read/write engine (used everywhere; CI lacked it → api.contract fail)
+pyarrow                    # parquet read/write
 scipy
 scikit-learn
-arch                       # GARCH(1,1) volatility forecasting (signal_board)
-pandas-market-calendars    # NYSE trading day calendar (daily_batch)
+arch                       # GARCH(1,1) volatility forecasting
+pandas-market-calendars    # NYSE trading day calendar
 
 # ── Data sources ─────────────────────────────────────────────────────────────
-yfinance                   # ETF prices + VIX
-requests                   # FRED CSV / CFTC COT (P3a) / generic HTTP
+yfinance                   # ETF prices + VIX (free)
+requests                   # FRED CSV / CFTC COT / generic HTTP
 feedparser                 # GNews / SEC EDGAR feed parsing
 
 # ── ORM + storage ────────────────────────────────────────────────────────────
 sqlalchemy                 # SQLite (dev) / PostgreSQL (prod)
-portalocker                # cross-platform file locking (engine/llm_cost_ledger.py)
-wrds                       # Wave B WRDS / CRSP+Compustat data access (activated 2026-05-11)
+portalocker                # cross-platform file locking (cost ledger writes)
 
-# ── UI (Streamlit + plotting) ────────────────────────────────────────────────
-streamlit
-plotly
-win10toast                 # Windows toast notifications (Ops Watchdog spec id=63 §2.6;
-                           # fail-soft if unavailable on non-Windows)
-
-# ── LLM (Gemini 2.5 Flash) ───────────────────────────────────────────────────
-google-generativeai
+# ── LLM (multi-provider routing in engine/llm/call.py) ───────────────────────
+google-generativeai        # Gemini Flash (~89% workload by volume)
 langgraph                  # agentic flow control
 langchain_google_genai
 
-# ── Project History RAG (P2 shipped 2026-05-07) ──────────────────────────────
+# ── Vector store + embeddings (paper retrieval + doctrine RAG) ───────────────
 chromadb                   # local persistent vector store
-sentence-transformers      # paraphrase-multilingual-mpnet-base-v2 embedding
+sentence-transformers      # paraphrase-multilingual-mpnet-base-v2 (pulls ~2GB torch)
 
-# ── Reporting / docs export ──────────────────────────────────────────────────
-python-docx
-reportlab
+# ── API + SSE (Operator Console backend) ─────────────────────────────────────
 fastapi>=0.136
 sse-starlette>=1.8
+
+# ── Reporting (PDF / DOCX exports) ───────────────────────────────────────────
+python-docx
+reportlab
+
+# ── Legacy engine integration (streamlit.session_state used by key_pool) ─────
+# NOTE: new UI is Next.js (frontend/); streamlit-based UIs are deprecated
+# per CLAUDE.md, but engine/key_pool.py still uses streamlit's session_state
+# for thread-local state, so the package is required. Will be removed when
+# key_pool migrates to a framework-neutral state store.
+streamlit
+
+# ── Optional (commented out — uncomment if you need) ─────────────────────────
+# wrds                     # institutional CRSP/Compustat/IBES; requires WRDS account
+# win10toast               # Windows-only toast notifications; fail-soft elsewhere
+# plotly                   # only needed by deprecated dev-side verify scripts
