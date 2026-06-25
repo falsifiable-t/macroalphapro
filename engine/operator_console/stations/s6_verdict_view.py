@@ -51,7 +51,7 @@ _PREDICTIONS_PATH = _REPO_ROOT / "data" / "research" / "predictions.jsonl"
 
 
 def _utc_iso() -> str:
-    return _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _find_verdict_event(verdict_event_id: str) -> dict | None:

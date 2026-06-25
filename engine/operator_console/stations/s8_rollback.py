@@ -61,7 +61,7 @@ _VALID_TARGETS = {"full_remove", "revert_to_previous_config", "freeze_only"}
 
 
 def _utc_iso() -> str:
-    return _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _resolve_deployed_sleeve(sleeve_id: str) -> dict | None:

@@ -81,7 +81,7 @@ class PipelineStation(ABC):
     # ── Required abstract methods ────────────────────────────────
 
     @abstractmethod
-    def preflight(self, session: Session, config: dict) -> PreflightResult:
+    def preflight(self, session: Session, config: dict[str, Any]) -> PreflightResult:
         """Validate that this station can run right now.
 
         Standard checks every station should include:
@@ -95,7 +95,7 @@ class PipelineStation(ABC):
         the list of checks into the can_trigger boolean."""
 
     @abstractmethod
-    def estimate_cost(self, config: dict) -> CostEstimate:
+    def estimate_cost(self, config: dict[str, Any]) -> CostEstimate:
         """Predict LLM + compute cost for the trigger. Used by the
         UI to render a 'This action will cost ~$X.XX' preview before
         the user clicks trigger.
@@ -104,7 +104,7 @@ class PipelineStation(ABC):
         triggers the cost-cap halt mid-execution per R6 in design doc."""
 
     @abstractmethod
-    def render_config_form(self) -> dict:
+    def render_config_form(self) -> dict[str, Any]:
         """Return a JSON Schema describing the configuration fields
         for this station. The frontend renders a generic form from
         this spec — no per-station React component required.
@@ -117,7 +117,7 @@ class PipelineStation(ABC):
     async def execute(
         self,
         session: Session,
-        config: dict,
+        config: dict[str, Any],
         emitter: SSEEmitter,
         cancellation: CancellationToken,
     ) -> StationResult:

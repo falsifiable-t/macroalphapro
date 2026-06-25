@@ -59,11 +59,11 @@ _VALID_TYPES = {"feedback", "project", "user", "reference"}
 
 
 def _utc_iso() -> str:
-    return _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _today_iso() -> str:
-    return _dt.datetime.utcnow().strftime("%Y-%m-%d")
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
 
 
 def _slug_to_filename(slug: str, doctrine_type: str) -> str:

@@ -464,7 +464,7 @@ class PaperIngest(PipelineStation):
 
 
 def _utc_iso() -> str:
-    return _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # ── Register at import time ──────────────────────────────────────

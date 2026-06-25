@@ -38,7 +38,7 @@ _EVENTS_PATH = _REPO_ROOT / "data" / "operator_console" / "events.jsonl"
 
 
 def _utc_iso() -> str:
-    return _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _ensure_path(path: Path) -> None:

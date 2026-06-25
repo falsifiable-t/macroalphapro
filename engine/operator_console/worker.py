@@ -41,13 +41,13 @@ logger = logging.getLogger(__name__)
 
 
 # job_id → asyncio.Queue of SSE event dicts
-JOB_QUEUES: dict[str, asyncio.Queue] = {}
+JOB_QUEUES: dict[str, asyncio.Queue[dict[str, Any]]] = {}
 
 # job_id → CancellationToken (so /cancel API can flip the flag)
 JOB_CANCELLATIONS: dict[str, CancellationToken] = {}
 
 
-def get_or_create_queue(job_id: str) -> asyncio.Queue:
+def get_or_create_queue(job_id: str) -> asyncio.Queue[dict[str, Any]]:
     """Lazy queue creation. Returned to both worker (push) and SSE
     endpoint (pull)."""
     q = JOB_QUEUES.get(job_id)
@@ -95,7 +95,7 @@ class QueueSSEEmitter:
     StationProgressStream consumer understands."""
 
     job_id: str
-    queue:  asyncio.Queue
+    queue:  asyncio.Queue[dict[str, Any]]
 
     def _put(self, event: str, payload: dict) -> None:
         try:
