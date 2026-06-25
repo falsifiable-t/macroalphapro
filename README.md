@@ -6,7 +6,7 @@ calibration of its own predictions before each test runs.**
 > One person. ~10 months. 4-sleeve canonical-replay strategy book
 > (Sharpe 1.32 backtest, paper-trade live), Belief Layer that air-gaps
 > every LLM prediction from the verdict pipeline so calibration is
-> measurable (n=94 prediction-verdict autopsies), 660+ paper ingestion
+> measurable (n=94 prediction-verdict autopsies at paper v0.9; cron-refreshed daily), 660+ paper ingestion
 > pipeline, end-to-end autonomous research demonstration on cross-asset
 > bond-VRP. The system measured its own predictor against a fair
 > family-prior baseline and found it loses by +0.114 Brier — and
@@ -14,7 +14,7 @@ calibration of its own predictions before each test runs.**
 
 **Author**: [Zhang Xizhe](https://www.linkedin.com/in/zhangxizhe) (NUS MSBA 2026)
 **Status**: paper-trade live since 2026-05-13 · Operator Console v1
-(7 of 9 Pipeline Stations) · arxiv preprint v0.9 ready for submission
+(9 of 9 Pipeline Stations) · arxiv preprint v0.9 ready for submission
 
 ---
 
@@ -39,9 +39,9 @@ event: `engine/research_store/events.jsonl` (event_type=factor_verdict_filed).
 | What | Number | Where to verify |
 |---|---|---|
 | Backtest Sharpe (4-sleeve canonical replay, 486 weeks) | **1.32** | [paper §4](docs/arxiv_preprint_draft_2026-06-22.md) |
-| **Honest negative finding** — predictor loses to fair baseline | Brier **0.374** vs FAIR family-prior **0.260** (Δ +0.114, 95% CI [+0.054, +0.173] excludes zero, 8 rigor tests, n=94) | paper §3, `engine/research/belief_track_record_rigor.py` |
+| **Honest negative finding** — predictor loses to fair baseline | Brier **0.374** vs FAIR family-prior **0.260** (Δ +0.114, 95% CI [+0.054, +0.173] excludes zero, 8 rigor tests, n=94 at paper v0.9; live count refreshes daily) | paper §3, `engine/research/belief_track_record_rigor.py` |
 | End-to-end autonomous demonstration | bond-VRP RED verdict, no human in the prediction loop (consistent with Carr-Wu 2009) | paper §5 |
-| **Operator Console (NEW 2026-06-23)** | **7 of 9 Pipeline Stations live** — UI-triggerable pipeline + typed sessions + per-session cost cap + SSE streaming + audit trail | `engine/operator_console/` |
+| **Operator Console (2026-06-23 → 9/9 stations 2026-06-25)** | **9 of 9 Pipeline Stations live** — UI-triggerable end-to-end research pipeline + typed sessions + per-session cost cap + SSE streaming + audit trail | `engine/operator_console/` |
 | Papers ingested + tagged | **661** via Stage-0 ClaimType router | `engine/agents/papers_curator/` |
 | Engineering surface | 117 research modules · 247 scripts · ~20 agents · FastAPI + Next.js · **5,805 pytest tests** | this repo |
 
@@ -129,22 +129,25 @@ Internal design memory: [INTERNAL_DESIGN_INDEX.md](INTERNAL_DESIGN_INDEX.md)
 
 ## Operator Console (UI-triggerable end-to-end pipeline)
 
-7 Pipeline Stations let an external operator drive the full research
+9 Pipeline Stations let an external operator drive the full research
 chain through clicks alone — no Claude conversation required.
 Sessions are typed (per CLAUDE.md doctrine), every action emits typed
 events, capital decisions stay human (S7+S8 route to /approvals
-without auto-deploying).
+without auto-deploying; the `mutates_capital` flag on StationSpec is
+import-time enforced).
 
 ```
 Session (research_new / audit / ops / doctrine / exploration)
    │
-   ├── S1  Paper Ingest         arxiv URL → ClaimType → registry         user_data    $0.00
-   ├── S3  FactorSpec Extract   hypothesis → factor_specs.jsonl          user_data    $0.05
+   ├── S1  Paper Ingest         arxiv URL → ClaimType → registry          user_data     $0.00
+   ├── S2  Hypothesize          recent papers → new hypothesis (LLM)      snapshot      $0.10
+   ├── S3  FactorSpec Extract   hypothesis → factor_specs.jsonl           user_data     $0.05
    ├── S4  FORWARD Dispatch     spec → strict-gate verdict (8 stat tests) wrds_required $0.10
-   ├── S6  Verdict View         verdict_event → prediction+autopsy drill snapshot     $0.00
-   ├── S7  PROMOTE 9-gate (MVP) GREEN verdict → /approvals (HUMAN gate)  snapshot     $0.00
-   ├── S8  Rollback             deployed sleeve → /approvals (HUMAN gate) snapshot    $0.00
-   └── S8b Doctrine Lock        form → memory/*.md + MEMORY.md + event    user_data   $0.00
+   ├── S5  ENHANCE Dispatch     variant CSV → paired bootstrap verdict    snapshot      $0.00
+   ├── S6  Verdict View         verdict_event → prediction+autopsy drill  snapshot      $0.00
+   ├── S7  PROMOTE 9-gate (MVP) GREEN verdict → /approvals (HUMAN gate)   snapshot      $0.00
+   ├── S8  Rollback             deployed sleeve → /approvals (HUMAN gate) snapshot      $0.00
+   └── S8b Doctrine Lock        form → memory/*.md + MEMORY.md + event    user_data     $0.00
 ```
 
 Each station has 5 elements: (1) preflight checks, (2) JSON-schema
@@ -152,10 +155,9 @@ config form, (3) cost-gated trigger, (4) SSE progress stream,
 (5) result + lineage hints to next station. Architecture doc:
 [docs/architecture/operator_console.md](docs/architecture/operator_console.md)
 
-Remaining stations (Phase 2 future): S2 Synthesize (LLM-heavy
-papers → new hypothesis), S5 ENHANCE Dispatch (paired bootstrap;
-needs variant returns input wiring), S7 Gates 2-8 full statistical
-implementations.
+Phase 2.2 / 3 deferred: S5 LLM-driven variant builder (today the
+operator supplies variant returns as a CSV path), S7 Gates 2-8 full
+statistical implementations (Gates 1+9 wired in MVP).
 
 ---
 
@@ -297,8 +299,10 @@ npm run dev          # http://localhost:3000
    inference (n=21 days as of 2026-06-22). Per-design CPCV expectation
    is Sharpe 0.85-1.15 (forward typically degrades from backtest).
 
-5. **Sample size on belief layer** — n=94 autopsies. Bootstrap CIs
-   are wide. The "0.000 Brier on 2 OOS pairs" headline is directional
+5. **Sample size on belief layer** — n=94 autopsies at paper v0.9
+   (live count grows daily via cron; current in
+   `data/research/belief_track_record_rigor.json`). Bootstrap CIs are
+   wide. The "0.000 Brier on 2 OOS pairs" headline is directional
    evidence, not validation. Validation requires ~30+ OOS pairs.
 
 6. **AI-augmented, not autonomous** — LLMs are bounded tools (paper
