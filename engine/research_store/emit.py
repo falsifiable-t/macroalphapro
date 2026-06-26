@@ -194,13 +194,54 @@ def factor_verdict(
     family: Optional[str] = None,
     tags: tuple = (),
     actor: str = DEFAULT_ACTOR,
+    requires_evidence_doc: bool = True,
+    evidence_doc_exempt_reason: Optional[str] = None,
 ) -> str:
     """A factor study completes with a strict-gate verdict.
 
     `artifacts` should include at minimum 'evidence_doc' (path to the
     capability_evidence markdown). 'data_dir' (path to the run outputs)
     is strongly encouraged. Both must exist on disk before this call.
+
+    ## evidence_doc enforcement (v15 2026-06-25)
+
+    By default `requires_evidence_doc=True` — caller MUST set
+    `artifacts['evidence_doc']` to a path that exists on disk.
+    Violators raise `InvalidEventError`. This closes the pre-v15 bug
+    where 15 GREEN verdicts shipped with empty evidence_doc, then
+    failed S7 Gate 3 (PIT clean) at promote time because their
+    audit trail was missing.
+
+    Shadow-emit / backfill / legacy callers that legitimately have
+    no doc (because the underlying decision predates the doctrine)
+    must pass `requires_evidence_doc=False` AND a non-empty
+    `evidence_doc_exempt_reason` explaining why. The reason is
+    auto-appended to `tags` as `evidence_doc_exempt:<reason>` so
+    downstream consumers (Gate 3, audit queries) can filter.
     """
+    if requires_evidence_doc:
+        doc = (artifacts or {}).get("evidence_doc", "")
+        if not doc or not str(doc).strip():
+            raise InvalidEventError(
+                "factor_verdict requires artifacts['evidence_doc'] to be a "
+                "non-empty path that exists on disk. If this is a shadow-"
+                "emit / backfill / legacy case where no doc exists by "
+                "design, pass requires_evidence_doc=False AND a non-empty "
+                "evidence_doc_exempt_reason explaining why."
+            )
+    else:
+        if not evidence_doc_exempt_reason or not evidence_doc_exempt_reason.strip():
+            raise InvalidEventError(
+                "requires_evidence_doc=False requires a non-empty "
+                "evidence_doc_exempt_reason. Don't silently skip the audit "
+                "trail — explain why this event has no evidence doc by "
+                "design (e.g. 'shadow_emit_from_factory_ledger', "
+                "'pre_doctrine_backfill')."
+            )
+        # Auto-tag so Gate 3 + audit queries can filter
+        exempt_tag = f"evidence_doc_exempt:{evidence_doc_exempt_reason.strip()[:80]}"
+        tags = tuple(tags) + (exempt_tag,)
+
     return _emit(
         EventType.factor_verdict_filed,
         subject_id=subject_id,

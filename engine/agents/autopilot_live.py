@@ -621,10 +621,14 @@ def run_top1(*, force_compose: bool = False, force_da: bool = False,
     verdict_tags = ["autopilot_f14b", da_tag]
     if da_tag != "da_skipped" and verdict != raw_verdict:
         verdict_tags.append(f"raw_verdict:{raw_verdict}")
+    # v15: factor_verdict requires artifacts['evidence_doc'] specifically
+    # (the per-doctrine canonical key). capability_evidence_filed above
+    # uses a different artifact key by convention; factor_verdict needs
+    # this exact one or it raises InvalidEventError.
     verdict_event_id = emit.factor_verdict(
         subject_id       = subject_id,
         verdict          = verdict,
-        artifacts        = {"capability_evidence": rel_evidence},
+        artifacts        = {"evidence_doc": rel_evidence},
         summary          = f"Autopilot F14b verdict={verdict} (score {score}/4) "
                             f"for {spec.family.value}/{spec.legs[0].signal_type.value} "
                             f"hyp={spec.source_hypothesis_id[:8]} "

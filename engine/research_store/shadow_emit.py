@@ -134,6 +134,11 @@ def shadow_emit_factor_verdict(
         metrics = _build_metrics(res, source)
 
         from engine.research_store import emit as rs_emit
+        # Shadow-emit doesn't have a capability_evidence/*.md doc by
+        # design — the underlying decision lives in the factory_ledger
+        # (a pre-event-store artifact). Opt out of the v15 evidence_doc
+        # requirement with an explicit reason so Gate 3 + audit queries
+        # can filter these out.
         event_id = rs_emit.factor_verdict(
             subject_id=name,
             verdict=verdict,
@@ -143,6 +148,8 @@ def shadow_emit_factor_verdict(
             family=family,
             tags=("shadow_emit", f"from_{source}", token),
             actor=f"shadow_emit:{source}",
+            requires_evidence_doc=False,
+            evidence_doc_exempt_reason=f"shadow_emit_from_{source}",
         )
         return event_id
 

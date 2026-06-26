@@ -234,6 +234,9 @@ def main() -> int:
 
         # Emit verdict
         try:
+            # T4.6 backfill predates the v15 evidence_doc requirement —
+            # the literature-graveyard source has summary + family but
+            # no per-paper capability_evidence/*.md doc by design.
             ev_id = rs_emit.factor_verdict(
                 subject_id=p["subject_id"],
                 verdict="RED",
@@ -246,6 +249,8 @@ def main() -> int:
                 family=p["family"],
                 tags=("literature_graveyard", "T4.6_backfill"),
                 actor="t4_6_backfill",
+                requires_evidence_doc=False,
+                evidence_doc_exempt_reason="t4_6_literature_graveyard_backfill",
             )
             n_ok += 1
             print(f"  OK  {ev_id[:8]}  {p['subject_id'][:40]:<40}  fam={p['family']}")
