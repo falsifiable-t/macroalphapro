@@ -5,24 +5,31 @@ FORWARD verdict and a deployed sleeve. Per CLAUDE.md doctrine, capital
 decisions stay HUMAN-only — even when all 8 deterministic gates pass,
 Gate 9 (human approval) NEVER auto-fires.
 
-MVP scope (Phase 2 honest delivery):
-  Gate 1  ✅ Verdict is GREEN          — deterministic; implemented
-  Gate 2  ⏳ Cost-robust                — Phase 2 polish; YELLOW info
-  Gate 3  ⏳ PIT clean                  — Phase 2 polish; YELLOW info
-  Gate 4  ⏳ Replication (γ persona)    — Phase 2 polish; YELLOW info
-  Gate 5  ⏳ Multi-period stability     — Phase 2 polish; YELLOW info
-  Gate 6  ⏳ Anchor-residual            — Phase 2 polish; YELLOW info
-  Gate 7  ⏳ Cross-sleeve correlation   — Phase 2 polish; YELLOW info
-  Gate 8  ⏳ Capacity (Pastor-Stambaugh)— Phase 2 polish; YELLOW info
-  Gate 9  ✅ HUMAN approval              — implemented; writes a
-                                          promote_proposal row and
-                                          routes to /approvals
+Gate inventory (real-implementation status; v14 refactor 2026-06-25):
+  Gate 1  ✅ Verdict is GREEN          — IMPLEMENTED (gate1_verdict_green.py)
+  Gate 2  ⏳ Cost-robust                — DEFERRED to Phase 2.x
+  Gate 3  ✅ PIT clean                  — IMPLEMENTED (gate3_pit_clean.py)
+  Gate 4  ⏳ Replication (γ persona)    — DEFERRED to Phase 2.x
+  Gate 5  ✅ Multi-period stability     — IMPLEMENTED (gate5_multi_period.py)
+  Gate 6  ✅ Anchor-residual            — IMPLEMENTED (gate6_anchor_residual.py)
+  Gate 7  ⏳ Cross-sleeve correlation   — DEFERRED (needs WRDS PnL)
+  Gate 8  ⏳ Capacity (Pastor-Stambaugh)— DEFERRED to Phase 2.x
+  Gate 9  ✅ HUMAN approval              — IMPLEMENTED in this station
+                                          (writes promote_proposal row,
+                                          routes to /approvals)
 
-When all 8 deterministic gates are implemented, only Gate 1 changes
-from "deterministic verify" to "deterministic verify of upstream
-verdict that itself ran gates 2-8 in a prior pipeline." S7's job is
-the orchestration layer + the human handoff, not re-running each
-statistical test.
+Each gate is a focused module under engine/operator_console/gates/.
+This station orchestrates them via the registry; the gates themselves
+own the statistical / provenance logic. See gates/__init__.py for
+the framework + how to add a new gate.
+
+Architectural note (v14): pre-v14 S7 had a critical bug — Gate 1 read
+verdict from `ev.get("payload", {}).get("verdict")` but the
+research_store schema stores `verdict` at top level of the event row.
+Result: all 70 GREEN events in the store hit Gate 1's YELLOW "legacy
+event?" fallback, meaning PROMOTE never actually gated on verdict
+color. The framework refactor reads the correct field via
+gate1_verdict_green.check().
 
 Design reference: docs/architecture/operator_console.md §5 (S7 spec).
 """
@@ -143,58 +150,36 @@ class Promote9Gate(PipelineStation):
         ev = _find_verdict_event(verdict_event_id)
         if ev is None:
             checks.append(PreflightCheck(
-                "gate1_verdict_resolvable", PreflightStatus.RED,
+                "verdict_event_resolvable", PreflightStatus.RED,
                 f"verdict_event_id '{verdict_event_id}' not in events.jsonl.",
             ))
             return PreflightResult.from_checks(checks)
 
-        # Gate 1: must be a factor_verdict_filed event AND verdict=GREEN
-        if ev.get("event_type") != "factor_verdict_filed":
+        # Run all 8 gates via the registry for UI feedback. Map each
+        # GateResult.status onto a PreflightStatus the launchpad UI
+        # already knows how to render.
+        from engine.operator_console.gates import GateStatus
+        from engine.operator_console.gates.registry import run_all_gates
+        gate_status_map = {
+            GateStatus.PASS:      PreflightStatus.GREEN,
+            GateStatus.SOFT_PASS: PreflightStatus.YELLOW,
+            GateStatus.FAIL:      PreflightStatus.RED,
+            GateStatus.DEFERRED:  PreflightStatus.YELLOW,
+            GateStatus.SKIPPED:   PreflightStatus.YELLOW,
+        }
+        for gr in run_all_gates(ev, config or {}):
             checks.append(PreflightCheck(
-                "gate1_event_type", PreflightStatus.RED,
-                f"Event type is '{ev.get('event_type')}', not factor_verdict_filed. PROMOTE only applies to FORWARD verdicts.",
-            ))
-        else:
-            checks.append(PreflightCheck("gate1_event_type", PreflightStatus.GREEN,
-                                         "Event is factor_verdict_filed."))
-
-        payload = ev.get("payload", {}) or {}
-        verdict = payload.get("verdict", "")
-        if verdict == "GREEN":
-            checks.append(PreflightCheck("gate1_verdict_is_green", PreflightStatus.GREEN,
-                                         f"Verdict=GREEN (subject_id={ev.get('subject_id', '?')})."))
-        elif verdict in ("MARGINAL", "RED"):
-            checks.append(PreflightCheck(
-                "gate1_verdict_is_green", PreflightStatus.RED,
-                f"Verdict='{verdict}' — only GREEN verdicts can be PROMOTED.",
-            ))
-        else:
-            # Legacy events have empty payload → can't determine verdict
-            checks.append(PreflightCheck(
-                "gate1_verdict_is_green", PreflightStatus.YELLOW,
-                f"Verdict missing from payload (legacy event?). Proceed at your own risk; this likely won't promote correctly.",
+                gr.gate_id,
+                gate_status_map.get(gr.status, PreflightStatus.YELLOW),
+                gr.summary,
             ))
 
-        # Gates 2-8: deferred — show as YELLOW info so user sees the full doctrine
-        deferred_gates = [
-            ("gate2_cost_robust",         "Cost-robust (Almgren-Chriss optimal execution gap)"),
-            ("gate3_pit_clean",           "PIT clean (look-ahead audit)"),
-            ("gate4_replication",         "Replication (γ persona confirms paper)"),
-            ("gate5_multi_period",        "Multi-period stability (Mann-Kendall across 5 sub-periods)"),
-            ("gate6_anchor_residual",     "Anchor-residual (post-FF5+MOM residual Sharpe > threshold)"),
-            ("gate7_cross_sleeve_corr",   "Cross-sleeve correlation (vs each deployed sleeve)"),
-            ("gate8_capacity",            "Capacity (Pastor-Stambaugh / Berk-Green ceiling)"),
-        ]
-        for name, desc in deferred_gates:
-            checks.append(PreflightCheck(
-                name, PreflightStatus.YELLOW,
-                f"DEFERRED (Phase 2 polish): {desc}. Will be SKIPPED in execute(); human reviewer should verify manually before approving at Gate 9.",
-            ))
-
-        # Gate 9: human approval — this is the GATE, not a check
+        # Gate 9: human approval — the GATE (writes proposal), not a check
         checks.append(PreflightCheck(
             "gate9_human_approval", PreflightStatus.YELLOW,
-            "Gate 9 = HUMAN approval (per CLAUDE.md capital-decision doctrine). S7 will NEVER auto-promote — it writes a proposal to /approvals and requires you to click APPROVE there.",
+            "Gate 9 = HUMAN approval (per CLAUDE.md capital-decision doctrine). "
+            "S7 will NEVER auto-promote — it writes a proposal to /approvals "
+            "and requires you to click APPROVE there.",
         ))
 
         return PreflightResult.from_checks(checks)
@@ -263,52 +248,60 @@ class Promote9Gate(PipelineStation):
         role             = str(c.get("role", "alpha")).strip()
         rationale        = str(c.get("rationale", "")).strip()
 
-        # ── Gate 1: deterministic GREEN verify ────────────────────
-        if cancellation.cancelled:
-            return self._cancelled(session, started_ts, "gate1_verify_green")
-        emitter.stage_started("gate1_verify_green", expected_seconds=1)
+        # ── Resolve the verdict event upfront ────────────────────
         ev = _find_verdict_event(verdict_event_id)
         if ev is None:
-            emitter.stage_failed("gate1_verify_green",
-                                   f"verdict_event_id '{verdict_event_id}' not in events.jsonl")
-            return self._failed(session, started_ts, "gate1_verify_green",
-                                f"verdict not found")
+            return self._failed(session, started_ts, "resolve_verdict",
+                                f"verdict_event_id '{verdict_event_id}' not in events.jsonl")
 
-        payload = ev.get("payload", {}) or {}
-        verdict = payload.get("verdict", "")
-        if verdict != "GREEN":
-            emitter.stage_failed(
-                "gate1_verify_green",
-                f"Refused: verdict='{verdict or '(missing)'}', need GREEN.",
-            )
-            return self._refused(session, started_ts, "gate1_verify_green",
-                                 f"verdict='{verdict}'; only GREEN can be promoted")
-        emitter.stage_completed("gate1_verify_green", {
-            "subject_id": ev.get("subject_id", ""),
-            "verdict": "GREEN",
-        })
+        # ── Gates 1-8: iterate the registry ──────────────────────
+        from engine.operator_console.gates import GateStatus, is_blocking
+        from engine.operator_console.gates.registry import GATES
+        gate_results: list[dict] = []
+        blocking_failure: tuple[str, str] | None = None
+        for gate_id, title, fn in GATES:
+            if cancellation.cancelled:
+                return self._cancelled(session, started_ts, gate_id)
+            emitter.stage_started(gate_id, expected_seconds=2)
+            try:
+                r = fn(ev, c)
+            except Exception as e:
+                emitter.stage_failed(gate_id, f"{type(e).__name__}: {str(e)[:200]}")
+                return self._failed(session, started_ts, gate_id,
+                                    f"{type(e).__name__}: {str(e)[:200]}")
+            gate_results.append({
+                "gate_id": gate_id,
+                "title":   title,
+                "status":  r.status.value,
+                "summary": r.summary,
+                "detail":  r.detail,
+            })
+            emitter.stage_completed(gate_id, {
+                "status":  r.status.value,
+                "summary": r.summary,
+            })
+            if is_blocking(r.status) and blocking_failure is None:
+                # First blocking gate aborts the chain. Return REFUSED
+                # immediately — capital decision cannot proceed.
+                blocking_failure = (gate_id, r.summary)
+                break
 
-        # ── Gates 2-8: stubbed deferred ──────────────────────────
-        emitter.stage_started("gates_2_through_8_deferred", expected_seconds=1)
-        deferred = [
-            "gate2_cost_robust",
-            "gate3_pit_clean",
-            "gate4_replication",
-            "gate5_multi_period",
-            "gate6_anchor_residual",
-            "gate7_cross_sleeve_corr",
-            "gate8_capacity",
-        ]
-        emitter.stage_completed("gates_2_through_8_deferred", {
-            "deferred_gates": deferred,
-            "note": "Phase 2 polish — human reviewer should verify manually at /approvals before clicking APPROVE.",
-        })
+        if blocking_failure is not None:
+            gate_id, reason = blocking_failure
+            return self._refused(session, started_ts, gate_id,
+                                 f"blocked at {gate_id}: {reason}",
+                                 gate_results=gate_results)
 
         # ── Gate 9: HUMAN approval — write proposal to /approvals ─
         if cancellation.cancelled:
             return self._cancelled(session, started_ts, "gate9_human_approval")
         emitter.stage_started("gate9_human_approval", expected_seconds=1)
         proposal_id = f"promote_{uuid.uuid4().hex[:12]}"
+        # Gates 1-8 audit trail goes into the proposal so /approvals UI
+        # + downstream consumers can see exactly what passed / soft-passed
+        # / was deferred before the human reviewer was asked
+        deferred_gates = [g["gate_id"] for g in gate_results
+                          if g["status"] in ("deferred", "skipped")]
         proposal = {
             "proposal_id":      proposal_id,
             "ts":               _utc_iso(),
@@ -320,7 +313,8 @@ class Promote9Gate(PipelineStation):
             "session_id":       session_id,
             "actor_id":         actor_id,
             "state":            "pending_human_approval",
-            "deferred_gates":   deferred,
+            "deferred_gates":   deferred_gates,
+            "gates_audit":      gate_results,
         }
         try:
             _write_promote_proposal(proposal)
@@ -377,8 +371,13 @@ class Promote9Gate(PipelineStation):
     def result_lineage(self, result: StationResult) -> list[NextStationHint]:
         return []
 
-    def _refused(self, session: Session, started_ts: str, stage: str, reason: str) -> StationResult:
-        """Refusal = successful execution that hit a gate. Not a failure."""
+    def _refused(self, session: Session, started_ts: str, stage: str, reason: str,
+                 gate_results: list[dict] | None = None) -> StationResult:
+        """Refusal = successful execution that hit a gate. Not a failure.
+
+        gate_results is the partial audit trail up to and including the
+        blocking gate. Surfaced in artifacts so the UI + /approvals row
+        can show exactly what passed before the chain halted."""
         return StationResult(
             job_id          = "",
             station_id      = self.STATION_SPEC.station_id,
@@ -391,6 +390,7 @@ class Promote9Gate(PipelineStation):
                 "outcome":         "REFUSED_AT_GATE",
                 "refused_at":      stage,
                 "refusal_reason":  reason,
+                "gates_audit":     gate_results or [],
             },
             events_emitted  = [],
             next_stations   = [],
