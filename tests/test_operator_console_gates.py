@@ -156,6 +156,7 @@ def test_gate3_fails_on_lookahead_red_flag(tmp_path):
 
 
 def test_gate5_pass_when_institutional_stable():
+    """Upstream institutional_stable=True is the gold-standard PASS path."""
     ev = {"metrics": {"subsample_stability": {
         "institutional_stable": True,
         "worst_best_sharpe_ratio": 0.65,
@@ -165,10 +166,24 @@ def test_gate5_pass_when_institutional_stable():
     assert r.status == GateStatus.PASS
 
 
-def test_gate5_soft_pass_moderate_decay():
+def test_gate5_pass_when_wb_meets_institutional_bar():
+    """v16: wb >= 0.4 is the bonus-PASS path even if upstream flag is False
+    (e.g. rounding edge cases where min_sharpe is exactly 0)."""
     ev = {"metrics": {"subsample_stability": {
         "institutional_stable": False,
-        "worst_best_sharpe_ratio": 0.45,  # >= 0.3 threshold
+        "worst_best_sharpe_ratio": 0.45,
+        "n_splits": 4,
+    }}}
+    r = gate5_multi_period.check(ev, {})
+    assert r.status == GateStatus.PASS
+
+
+def test_gate5_soft_pass_moderate_decay():
+    """v16: 0.15 <= wb < 0.4 is the modal empirical range — SOFT_PASS,
+    not FAIL. Empirical study showed 86% of GREEN events sit here."""
+    ev = {"metrics": {"subsample_stability": {
+        "institutional_stable": False,
+        "worst_best_sharpe_ratio": 0.20,
         "n_splits": 4,
     }}}
     r = gate5_multi_period.check(ev, {})
@@ -176,13 +191,27 @@ def test_gate5_soft_pass_moderate_decay():
 
 
 def test_gate5_fail_severe_decay():
+    """v16: only wb < 0.15 (worst <15% of best — severe decay) FAILs."""
     ev = {"metrics": {"subsample_stability": {
         "institutional_stable": False,
-        "worst_best_sharpe_ratio": 0.15,  # < 0.3 threshold
+        "worst_best_sharpe_ratio": 0.10,
         "n_splits": 4,
     }}}
     r = gate5_multi_period.check(ev, {})
     assert r.status == GateStatus.FAIL
+
+
+def test_gate5_soft_pass_when_wb_uncomputable():
+    """If worst_best_sharpe_ratio is None (best window Sharpe <= 0), the
+    ratio is meaningless — return SOFT_PASS with a reviewer prompt
+    rather than crashing or auto-failing."""
+    ev = {"metrics": {"subsample_stability": {
+        "institutional_stable": False,
+        "worst_best_sharpe_ratio": None,
+        "n_splits": 3,
+    }}}
+    r = gate5_multi_period.check(ev, {})
+    assert r.status == GateStatus.SOFT_PASS
 
 
 def test_gate5_skipped_no_subsample_block():

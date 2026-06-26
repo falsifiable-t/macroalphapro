@@ -48,6 +48,14 @@ class SleeveSpec:
     research_keywords:     tuple[str, ...] = ()
     academic_anchors:      tuple[str, ...] = ()
     improvement_directions: tuple[str, ...] = ()
+    # 2026-06-26 audit-trail field — every NEW sleeve must link back to
+    # the factor_verdict_filed event that S7 PROMOTE proposed it from
+    # (or the explicit "principal_direct_deploy:<rationale>" marker if
+    # the sleeve was direct-edited into the YAML pre-Operator-Console).
+    # Empty string is allowed for legacy back-compat but flagged by
+    # `assert_promote_provenance_coverage()` below — the function
+    # returns a list of sleeves missing this field for ops dashboards.
+    source_verdict_event_id: str = ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -155,6 +163,7 @@ def load_active(*, force_reload: bool = False) -> DeployedConfig:
             research_keywords     = tuple(str(x) for x in (s.get("research_keywords") or [])),
             academic_anchors      = tuple(str(x) for x in (s.get("academic_anchors") or [])),
             improvement_directions= tuple(str(x) for x in (s.get("improvement_directions") or [])),
+            source_verdict_event_id = str(s.get("source_verdict_event_id", "")),
         )
         for s in (match.get("sleeves") or [])
     )
@@ -192,6 +201,43 @@ def assert_research_map_coverage() -> list[str]:
             issues.append(
                 f"sleeve {s.name!r} has no research_keywords — L2 paper "
                 f"filter will miss papers about this mechanism"
+            )
+    return issues
+
+
+def assert_promote_provenance_coverage() -> list[str]:
+    """Return a list of sleeves missing `source_verdict_event_id` — i.e.
+    sleeves that have no audit-trail link back to the factor_verdict_filed
+    event (or explicit principal_direct_deploy marker) that put them in
+    the book.
+
+    Empty result = every deployed sleeve traces back to either an S7
+    PROMOTE proposal or an explicit principal direct-deploy record.
+
+    Audit history (2026-06-26): all 5 sleeves in the active config
+    predate S7 ship (Operator Console 2026-06-23) and were direct-edited
+    into the YAML by the principal during pre-Operator-Console
+    development. They legitimately have empty source_verdict_event_id;
+    the field was added for FORWARD-looking new deploys, not retroactive.
+
+    Going forward, new sleeves added to the YAML SHOULD either:
+      - reference a real factor_verdict_filed event_id (S7-promoted), OR
+      - use the explicit string 'principal_direct_deploy:<rationale>'
+        (a deliberate human override with audit context)
+
+    The function returns the issue list; callers decide whether to
+    block (strict) or warn (current default)."""
+    cfg = load_active()
+    issues: list[str] = []
+    for s in cfg.sleeves:
+        link = (s.source_verdict_event_id or "").strip()
+        if not link:
+            issues.append(
+                f"sleeve {s.name!r} has no source_verdict_event_id — "
+                f"no audit-trail link back to a factor_verdict_filed "
+                f"event. Acceptable for pre-Operator-Console legacy "
+                f"sleeves; new sleeves should link or mark "
+                f"'principal_direct_deploy:<rationale>'."
             )
     return issues
 

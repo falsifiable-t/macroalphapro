@@ -246,4 +246,107 @@ Full rationale + industrial precedent in
 
 ---
 
+## FORWARD GREEN ≠ Deploy-Ready Doctrine (2026-06-26, STANDING)
+
+A **FORWARD GREEN verdict** answers "is X a real, statistically
+significant alpha at single-period in-sample inference?" It does
+NOT answer "should we deploy capital on X?". Those are different
+questions with different bars.
+
+### Why this exists
+
+v14 wired up S7 PROMOTE's 8-gate framework + ran the chain on 70
+real GREEN events from the store. Result: only 24 of 70 (34%)
+survived all 8 gates. The other 46 were correctly REFUSED:
+
+  - **30 (43%)** blocked at Gate 5 (multi-period stability) —
+    worst-window Sharpe was a small fraction of best-window Sharpe.
+    The FORWARD strict-gate (FF5+MOM spanning + Bailey-LdP DSR
+    + bootstrap CI) detected statistically-significant alpha
+    in-sample but had no multi-period structural test.
+  - **15 (21%)** blocked at Gate 3 (PIT clean) — the verdict event
+    had no resolvable evidence_doc on disk. v15 closed this gap at
+    the emit boundary; legacy events remain.
+  - **1 (1%)** blocked at Gate 6 (anchor-residual) — residual α
+    after FF5+MOM was not distinguishable from zero.
+
+v16 recalibrated Gate 5 thresholds empirically and the new rate is
+28 of 71 (39%) promote-eligible. The remaining 60% are correctly
+held back not by framework bugs but by structural concerns the
+FORWARD pipeline doesn't address.
+
+### The doctrine
+
+  - **FORWARD pipeline** answers "is X a real alpha?" — single-
+    period spanning + DSR + bootstrap. Output: GREEN / MARGINAL / RED.
+  - **A GREEN verdict means "candidate for promote consideration"**.
+    It does NOT mean "approved for deployment."
+  - **S7 PROMOTE gate chain** answers "should we deploy capital on
+    X?" — adds 7 more checks (cost-robust / PIT / γ replication /
+    multi-period stability / anchor-residual / cross-sleeve correl /
+    capacity). Gate 9 is the human handoff.
+  - **No factor reaches deployed_registry without explicit human
+    APPROVE at /approvals**. The framework guarantees the gate-chain
+    audit trail is filed; the human guarantees the capital decision.
+
+### Implications for naming + UI
+
+  - Do not use "GREEN" as a synonym for "ready to deploy" in UI
+    copy, dashboards, or memos. Use "FORWARD verdict GREEN" + a
+    separate "promote-eligible after S7 gates" status.
+  - The `/research/forward` UI tab shows FORWARD verdicts. The
+    `/approvals` UI tab shows S7 PROMOTE proposals. Two different
+    surfaces.
+  - When citing the system's discipline externally (recruiters,
+    arxiv, etc.), the headline isn't the GREEN rate — it's the
+    *34-39% promote-eligible* rate. That's where institutional
+    capital-decision discipline shows up.
+
+### Threshold calibration (Gate 5 specifically)
+
+Per the v16 empirical study on 117 verdicts with subsample blocks:
+
+  - Tier 1 PASS:      `institutional_stable=True` (upstream flag —
+                       requires wb ≥ 0.4 AND min_sharpe > 0)
+  - Tier 1 PASS:      OR wb ≥ 0.4 (bonus path for rounding edge cases)
+  - Tier 2 SOFT_PASS: 0.15 ≤ wb < 0.4 (empirical modal band; ~80% of
+                       real GREEN verdicts sit here per measurement)
+  - Tier 3 FAIL:      wb < 0.15 (severe decay — worst window <15%
+                       of best; capital deployment here would be
+                       buying fading alpha)
+
+The previous 0.3 FAIL threshold (v14) rejected 86% of GREEN; it was
+empirically too tight. McLean-Pontiff (2016) 32-58% post-publication
+Sharpe drop is the literature anchor for "moderate decay is normal."
+
+### Deployed-sleeve provenance (separate audit)
+
+All 5 currently-deployed sleeves (as of 2026-06-26) **predate the
+S7 PROMOTE framework**. They were direct-edited into the deployed
+config YAML during pre-Operator-Console development. They have NO
+`source_verdict_event_id` field set; `engine.portfolio.deployed_
+registry.assert_promote_provenance_coverage()` reports 5 issues.
+
+This is acceptable for legacy back-compat. Going forward, **every
+new deployed sleeve MUST set `source_verdict_event_id`** to either:
+  - the factor_verdict_filed event_id that S7 PROMOTE proposed it
+    from, OR
+  - the explicit string `principal_direct_deploy:<rationale>` if
+    the deploy is a deliberate human override that bypasses S7
+
+### Forbidden
+
+- Promoting a non-GREEN verdict (S7 Gate 1 enforces; v15 closes
+  the schema-bug fallback).
+- Adding a new gate without including FAIL/SOFT_PASS/PASS/SKIPPED
+  paths in the unit test suite (`tests/test_operator_console_gates.py`).
+- Deploying a new sleeve without `source_verdict_event_id`
+  (currently warn-only via `assert_promote_provenance_coverage`;
+  may become strict in a future revision).
+- Treating Gate 5 worst-best ratio in [0.15, 0.4) as either auto-
+  PASS or auto-FAIL — it's the SOFT_PASS band requiring S7 Gates
+  2/4/6/7/8 to compensate, plus human review at Gate 9.
+
+---
+
 ## (Add other project-wide doctrines below as they are locked.)
